@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Resume Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">GitHub Resume Analyzer</h1>
+            <p class="text-gray-600">Enter a GitHub username to generate a professional resume analysis</p>
+        </div>
+
+        <div class="max-w-md mx-auto">
+            <form id="analyzeForm" class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+                <div class="mb-4">
+                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                           type="text" 
+                           id="username" 
+                           name="username" 
+                           placeholder="GitHub Username"
+                           required>
+                </div>
+                <div class="flex items-center justify-center">
+                    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                            type="submit">
+                        Analyze Profile
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div id="loading" class="hidden text-center">
+            <div class="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto"></div>
+            <p class="mt-4 text-gray-600">Analyzing profile...</p>
+        </div>
+
+        <div id="result" class="hidden max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
+            <!-- Profile Header -->
+            <div class="flex items-center p-6 bg-gray-50 border-b">
+                <img id="avatar" class="w-24 h-24 rounded-full" src="" alt="Profile Picture">
+                <div class="ml-6">
+                    <h2 id="name" class="text-2xl font-bold text-gray-800"></h2>
+                    <p id="bio" class="text-gray-600 mt-1"></p>
+                    <div class="flex mt-2 text-sm text-gray-600">
+                        <span id="location" class="mr-4"></span>
+                        <span id="email" class="mr-4"></span>
+                        <span id="blog"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-6">
+                <div class="bg-gray-50 rounded p-4 text-center">
+                    <h3 class="text-lg font-semibold text-gray-700">Public Repos</h3>
+                    <p id="public_repos" class="text-2xl font-bold text-blue-500"></p>
+                </div>
+                <div class="bg-gray-50 rounded p-4 text-center">
+                    <h3 class="text-lg font-semibold text-gray-700">Followers</h3>
+                    <p id="followers" class="text-2xl font-bold text-blue-500"></p>
+                </div>
+                <div class="bg-gray-50 rounded p-4 text-center">
+                    <h3 class="text-lg font-semibold text-gray-700">Total Stars</h3>
+                    <p id="total_stars" class="text-2xl font-bold text-blue-500"></p>
+                </div>
+            </div>
+
+            <!-- Languages Chart -->
+            <div class="p-6 border-t">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Programming Languages</h3>
+                <canvas id="languagesChart" width="400" height="200"></canvas>
+            </div>
+
+            <!-- Top Repositories -->
+            <div class="p-6 border-t">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Top Repositories</h3>
+                <div id="top_repos" class="space-y-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('analyzeForm');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        let languagesChart = null;
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            loading.classList.remove('hidden');
+            result.classList.add('hidden');
+
+            const formData = new FormData(form);
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayResults(data);
+                } else {
+                    alert(data.error || 'An error occurred');
+                }
+            } catch (error) {
+                alert('An error occurred');
+            } finally {
+                loading.classList.add('hidden');
+            }
+        });
+
+        function displayResults(data) {
+            // Update profile information
+            document.getElementById('avatar').src = data.avatar_url;
+            document.getElementById('name').textContent = data.name;
+            document.getElementById('bio').textContent = data.bio || '';
+            document.getElementById('location').textContent = data.location ? `📍 ${data.location}` : '';
+            document.getElementById('email').textContent = data.email ? `📧 ${data.email}` : '';
+            document.getElementById('blog').textContent = data.blog ? `🔗 ${data.blog}` : '';
+
+            // Update stats
+            document.getElementById('public_repos').textContent = data.public_repos;
+            document.getElementById('followers').textContent = data.followers;
+            document.getElementById('total_stars').textContent = data.total_stars;
+
+            // Update languages chart
+            const ctx = document.getElementById('languagesChart').getContext('2d');
+            if (languagesChart) {
+                languagesChart.destroy();
+            }
+            languagesChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(data.languages),
+                    datasets: [{
+                        data: Object.values(data.languages),
+                        backgroundColor: [
+                            '#FF6384',
+                            '#36A2EB',
+                            '#FFCE56',
+                            '#4BC0C0',
+                            '#9966FF',
+                            '#FF9F40'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        }
+                    }
+                }
+            });
+
+            // Update top repositories
+            const topReposContainer = document.getElementById('top_repos');
+            topReposContainer.innerHTML = '';
+            data.top_repos.forEach(repo => {
+                const repoElement = document.createElement('div');
+                repoElement.className = 'bg-gray-50 rounded p-4';
+                repoElement.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <a href="${repo.url}" target="_blank" class="text-blue-600 hover:text-blue-800 font-semibold">
+                                ${repo.name}
+                            </a>
+                            <p class="text-gray-600 text-sm mt-1">${repo.description || 'No description available'}</p>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="text-yellow-500 mr-1">⭐</span>
+                            <span class="text-gray-700">${repo.stars}</span>
+                        </div>
+                    </div>
+                    ${repo.language ? `<div class="mt-2 text-sm text-gray-500">Main language: ${repo.language}</div>` : ''}
+                `;
+                topReposContainer.appendChild(repoElement);
+            });
+
+            result.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
