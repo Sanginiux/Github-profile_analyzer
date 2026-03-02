@@ -34,12 +34,6 @@ This project is built using **Flask (Python backend)**, **Tailwind CSS**, and **
 
 ---
 
-## 📷 Preview
-
-> *(Add screenshots of your UI here for better presentation)*
-
----
-
 ## ⚙ Installation & Setup
 
 ### 1. Clone the repository
